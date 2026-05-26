@@ -1,18 +1,18 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-
-type Sender = 'user' | 'agent';
-
-type Message = {
-	sender: Sender;
-	text: string;
-};
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport } from 'ai';
+import { useAppKit, useAppKitAccount, useAppKitNetwork } from '@reown/appkit/react';
+import type { LifiAgentUIMessage } from '@/lib/agents/lifi-agent';
+import { createBrowserStore } from '@/lib/storage/browser-store';
+import { AgentMessage } from '@/components/agent/agent-message';
 
 type Session = {
 	id: string;
 	title: string;
-	messages: Message[];
+	messages: LifiAgentUIMessage[];
+	createdAt?: number;
 };
 
 type IconName =
@@ -25,36 +25,31 @@ type IconName =
 	| 'plus'
 	| 'settings'
 	| 'terminal'
-	| 'trash'
-	| 'trash-2';
-
-const initialSessions: Session[] = [
-	{
-		id: '1',
-		title: '关于极简设计美学',
-		messages: [
-			{
-				sender: 'user',
-				text: '为什么 ChatGPT 的界面设计得这么简单？',
-			},
-			{
-				sender: 'agent',
-				text: 'ChatGPT 采用极简设计的核心原因在于减少用户的认知负担。克制的黑、白、灰色调和充足留白，把视觉焦点交给内容与对话。工具本身应该尽量隐形，让用户专注于思考与交互。',
-			},
-		],
-	},
-];
+	| 'trash-2'
+	| 'stop-circle'
+	| 'sun'
+	| 'moon';
 
 const promptCards = [
 	{
-		title: '制定计划',
-		description: '规划一个高效率、低内耗的日常作息表',
-		prompt: '帮我制定一个极简主义的日常作息表',
+		title: '1️⃣ Base ETH → Arbitrum USDC',
+		description: '用 Base 上的 0.00001 ETH 换 Arbitrum 上的 USDC',
+		prompt: 'Swap 0.00001 ETH on Base to USDC on Arbitrum',
 	},
 	{
-		title: '探索概念',
-		description: '用通俗语言解释奥卡姆剃刀',
-		prompt: '解释什么是“奥卡姆剃刀原理”？',
+		title: '2️⃣ BSC USDT → Ethereum USDC',
+		description: '把 BSC 上的 5 USDT 转为 Ethereum 上的 USDC',
+		prompt: 'Swap 5 USDT on BSC to USDC on Ethereum',
+	},
+	{
+		title: '3️⃣ Base USDC → Arbitrum ETH',
+		description: '想在 Base 收到 0.001 USDC，用 Arbitrum 的 ETH 支付',
+		prompt: 'I want to receive 0.001 USDC on Base, pay with ETH on Arbitrum',
+	},
+	{
+		title: '4️⃣ BSC BNB → BSC USDT',
+		description: '用 BSC 上的 0.00001 BNB 换 BSC 上的 USDT',
+		prompt: 'Swap 0.00001 BNB on BSC to USDT on BSC',
 	},
 ];
 
@@ -68,13 +63,7 @@ const iconPaths: Record<IconName, React.ReactNode> = {
 	bot: (
 		<>
 			<path d='M12 8V4H8' />
-			<rect
-				width='16'
-				height='12'
-				x='4'
-				y='8'
-				rx='3'
-			/>
+			<rect width='16' height='12' x='4' y='8' rx='3' />
 			<path d='M2 14h2' />
 			<path d='M20 14h2' />
 			<path d='M9 13v2' />
@@ -93,26 +82,14 @@ const iconPaths: Record<IconName, React.ReactNode> = {
 	),
 	'panel-left-close': (
 		<>
-			<rect
-				width='18'
-				height='18'
-				x='3'
-				y='3'
-				rx='2'
-			/>
+			<rect width='18' height='18' x='3' y='3' rx='2' />
 			<path d='M9 3v18' />
 			<path d='m16 15-3-3 3-3' />
 		</>
 	),
 	'panel-left-open': (
 		<>
-			<rect
-				width='18'
-				height='18'
-				x='3'
-				y='3'
-				rx='2'
-			/>
+			<rect width='18' height='18' x='3' y='3' rx='2' />
 			<path d='M9 3v18' />
 			<path d='m14 9 3 3-3 3' />
 		</>
@@ -126,31 +103,14 @@ const iconPaths: Record<IconName, React.ReactNode> = {
 	settings: (
 		<>
 			<path d='M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.73l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z' />
-			<circle
-				cx='12'
-				cy='12'
-				r='3'
-			/>
+			<circle cx='12' cy='12' r='3' />
 		</>
 	),
 	terminal: (
 		<>
 			<path d='m7 11 3-3-3-3' />
 			<path d='M11 13h6' />
-			<rect
-				width='18'
-				height='18'
-				x='3'
-				y='3'
-				rx='2'
-			/>
-		</>
-	),
-	trash: (
-		<>
-			<path d='M3 6h18' />
-			<path d='M8 6V4h8v2' />
-			<path d='M19 6l-1 14H6L5 6' />
+			<rect width='18' height='18' x='3' y='3' rx='2' />
 		</>
 	),
 	'trash-2': (
@@ -161,6 +121,21 @@ const iconPaths: Record<IconName, React.ReactNode> = {
 			<path d='M10 11v6' />
 			<path d='M14 11v6' />
 		</>
+	),
+	'stop-circle': (
+		<>
+			<circle cx='12' cy='12' r='10' />
+			<rect x='9' y='9' width='6' height='6' rx='1' />
+		</>
+	),
+	sun: (
+		<>
+			<circle cx='12' cy='12' r='4' />
+			<path d='M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41' />
+		</>
+	),
+	moon: (
+		<path d='M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z' />
 	),
 };
 
@@ -192,27 +167,104 @@ function createSession(title = '新的对话'): Session {
 		id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
 		title,
 		messages: [],
+		createdAt: Date.now(),
 	};
+}
+
+function formatDateTime(ts?: number): string {
+	if (!ts) return '';
+	const d = new Date(ts);
+	const p = (n: number) => String(n).padStart(2, '0');
+	return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
 function getShortTitle(text: string, limit: number) {
 	return text.length > limit ? `${text.slice(0, limit)}...` : text;
 }
 
+const store = createBrowserStore();
+
 export function AiStudioChat() {
-	const [sessions, setSessions] = useState<Session[]>(initialSessions);
-	const [currentSessionId, setCurrentSessionId] = useState('1');
+	const [sessions, setSessions] = useState<Session[]>([]);
+	const [currentSessionId, setCurrentSessionId] = useState('');
 	const [input, setInput] = useState('');
 	const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+	const [deletingId, setDeletingId] = useState<string | null>(null);
+	const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const chatContainerRef = useRef<HTMLDivElement>(null);
 
-	const currentSession = useMemo(
-		() => sessions.find((session) => session.id === currentSessionId) ?? null,
-		[currentSessionId, sessions],
-	);
+	const { open: openAppKit } = useAppKit();
+	const { isConnected, address } = useAppKitAccount();
+	const { chainId: connectedChainId, caipNetwork } = useAppKitNetwork();
 
+	const currentSession = sessions.find((s) => s.id === currentSessionId) ?? null;
 	const hasMessages = Boolean(currentSession?.messages.length);
+
+	useEffect(() => {
+		store.listSessions().then((stored) => {
+			if (stored.length > 0) {
+				const typed = stored.map((s) => ({
+					...s,
+					messages: (s.messages ?? []) as LifiAgentUIMessage[],
+				}));
+				setSessions(typed);
+				setCurrentSessionId(typed[0].id);
+			}
+		});
+	}, []);
+
+	useEffect(() => {
+		const saved = localStorage.getItem('lifi-theme') as 'dark' | 'light' | null;
+		if (saved) setTheme(saved);
+	}, []);
+
+	function toggleTheme() {
+		setTheme((prev) => {
+			const next = prev === 'dark' ? 'light' : 'dark';
+			localStorage.setItem('lifi-theme', next);
+			return next;
+		});
+	}
+
+	const { messages, sendMessage, status, stop } = useChat<LifiAgentUIMessage>({
+		transport: new DefaultChatTransport({
+			api: '/api/chat',
+			body: () => ({
+				sessionId: currentSessionId,
+				walletAddress: address ?? undefined,
+				chainId: connectedChainId ?? undefined,
+			}),
+		}),
+		id: currentSessionId || undefined,
+		initialMessages: currentSession?.messages ?? [],
+		onFinish: ({ messages: finished }) => {
+			if (!currentSessionId) return;
+			const session = sessions.find((s) => s.id === currentSessionId);
+			if (!session) return;
+			const updated: Session = {
+				...session,
+				messages: finished as LifiAgentUIMessage[],
+				updatedAt: Date.now(),
+			} as Session & { updatedAt: number };
+			setSessions((prev) =>
+				prev.map((s) => (s.id === currentSessionId ? updated : s)),
+			);
+			store.saveSession({
+				...updated,
+				orderIds: [],
+				createdAt: (updated as unknown as { createdAt?: number }).createdAt ?? Date.now(),
+				updatedAt: Date.now(),
+			});
+		},
+	} as Parameters<typeof useChat<LifiAgentUIMessage>>[0]);
+
+	const isStreaming = status === 'streaming' || status === 'submitted';
+
+	useEffect(() => {
+		const el = chatContainerRef.current;
+		if (el) el.scrollTop = el.scrollHeight;
+	}, [messages]);
 
 	useEffect(() => {
 		const textarea = textareaRef.current;
@@ -222,305 +274,336 @@ export function AiStudioChat() {
 	}, [input]);
 
 	useEffect(() => {
-		const chatContainer = chatContainerRef.current;
-		if (!chatContainer) return;
-		chatContainer.scrollTop = chatContainer.scrollHeight;
-	}, [sessions, currentSessionId]);
-
-	useEffect(() => {
 		const handleShortcut = (event: KeyboardEvent) => {
 			if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
 				event.preventDefault();
 				startNewSession();
 			}
 		};
-
 		window.addEventListener('keydown', handleShortcut);
 		return () => window.removeEventListener('keydown', handleShortcut);
 	});
 
 	function startNewSession() {
-		const newSession = createSession();
-		setSessions((previous) => [newSession, ...previous]);
-		setCurrentSessionId(newSession.id);
+		setCurrentSessionId('');
+		setInput('');
 		requestAnimationFrame(() => textareaRef.current?.focus());
 	}
 
 	function deleteSession(id: string) {
-		setSessions((previous) => {
-			const nextSessions = previous.filter((session) => session.id !== id);
+		setDeletingId(null);
+		setSessions((prev) => {
+			const next = prev.filter((s) => s.id !== id);
 			if (id === currentSessionId) {
-				setCurrentSessionId(nextSessions[0]?.id ?? '');
+				setCurrentSessionId(next[0]?.id ?? '');
 			}
-			return nextSessions;
+			return next;
 		});
+		store.deleteSession(id);
 	}
 
 	function renameSession(id: string) {
-		const session = sessions.find((item) => item.id === id);
+		const session = sessions.find((s) => s.id === id);
 		if (!session) return;
-
 		const title = window.prompt('重命名此对话', session.title)?.trim();
 		if (!title) return;
-
-		setSessions((previous) =>
-			previous.map((item) => (item.id === id ? { ...item, title } : item)),
+		setSessions((prev) =>
+			prev.map((s) => (s.id === id ? { ...s, title } : s)),
 		);
 	}
 
-	function clearCurrentMessages() {
-		if (!currentSessionId) return;
-		setSessions((previous) =>
-			previous.map((session) =>
-				session.id === currentSessionId
-					? { ...session, messages: [] }
-					: session,
-			),
-		);
-	}
+	const handleSend = useCallback(
+		(text = input.trim()) => {
+			const messageText = text.trim();
+			if (!messageText || isStreaming) return;
 
-	function sendMessage(text = input.trim()) {
-		const messageText = text.trim();
-		if (!messageText) return;
-
-		let targetSessionId = currentSessionId;
-
-		setSessions((previous) => {
-			let nextSessions = previous;
-
-			if (!targetSessionId) {
-				const newSession = createSession(getShortTitle(messageText, 12));
-				targetSessionId = newSession.id;
-				nextSessions = [newSession, ...previous];
-				setCurrentSessionId(newSession.id);
+			if (!isConnected) {
+				openAppKit();
+				return;
 			}
 
-			return nextSessions.map((session) => {
-				if (session.id !== targetSessionId) return session;
+			let targetId = currentSessionId;
 
-				const shouldRename = session.messages.length === 0;
-				return {
-					...session,
-					title: shouldRename ? getShortTitle(messageText, 12) : session.title,
-					messages: [
-						...session.messages,
-						{ sender: 'user', text: messageText },
-					],
-				};
-			});
-		});
+			if (!targetId) {
+				const newSession = createSession(getShortTitle(messageText, 12));
+				setSessions((prev) => [newSession, ...prev]);
+				setCurrentSessionId(newSession.id);
+				targetId = newSession.id;
+			} else {
+				setSessions((prev) =>
+					prev.map((s) => {
+						if (s.id !== targetId) return s;
+						return s.messages.length === 0
+							? { ...s, title: getShortTitle(messageText, 12) }
+							: s;
+					}),
+				);
+			}
 
-		setInput('');
+			sendMessage({ text: messageText });
+			setInput('');
+		},
+		[input, currentSessionId, isStreaming, sendMessage, isConnected, openAppKit],
+	);
 
-		window.setTimeout(() => {
-			setSessions((previous) =>
-				previous.map((session) =>
-					session.id === targetSessionId
-						? {
-								...session,
-								messages: [
-									...session.messages,
-									{
-										sender: 'agent',
-										text: `这是一个模拟回复。我已经收到你发送的信息：\n\n“${messageText}”\n\n当前界面已拆分为 Next.js 客户端组件，后续可以在这个结构里接入真实的大语言模型接口。`,
-									},
-								],
-							}
-						: session,
-				),
-			);
-		}, 600);
-	}
+	// When streaming, show live useChat messages. Otherwise show persisted session messages.
+	// This fixes the bug where switching sessions clears the message history.
+	const displayMessages: LifiAgentUIMessage[] = isStreaming
+		? (messages as LifiAgentUIMessage[])
+		: (currentSession?.messages ?? []);
 
 	return (
-		<main className='flex h-dvh overflow-hidden bg-[#212121] text-[#ececec]'>
+		<main className='flex h-dvh overflow-hidden bg-(--c-bg) text-(--c-text1)' data-theme={theme}>
 			<aside
-				className={`z-20 flex h-full shrink-0 flex-col border-r border-[#2f2f2f] bg-[#171717] transition-all duration-300 ${
-					isSidebarOpen
-						? 'w-64 opacity-100'
-						: 'w-0 overflow-hidden opacity-0 pointer-events-none'
-				}`}
-				aria-label='对话历史'
-			>
-				<section className='flex items-center justify-between p-3.5'>
-					<button
-						className='group flex flex-1 items-center justify-between rounded-lg px-3 py-2 text-sm font-normal text-white transition hover:bg-[#212121]'
-						onClick={startNewSession}
-						type='button'
-					>
-						<span className='flex items-center gap-2'>
-							<Icon
-								className='h-4 w-4 text-[#b4b4b4] transition group-hover:text-white'
-								name='plus'
-							/>
-							新对话
+			className={`z-20 flex h-full shrink-0 flex-col border-r border-(--c-border) bg-(--c-sidebar) transition-all duration-300 ${
+				isSidebarOpen ? 'w-64' : 'w-14'
+			}`}
+			aria-label='对话历史'
+		>
+			<header className='flex items-center justify-between border-b border-(--c-border) px-3 py-3'>
+				<div className='flex min-w-0 items-center gap-2.5'>
+					<img
+						alt='LI.FI'
+						className='h-8 w-8 shrink-0 rounded-lg object-contain'
+						src='/logo.png'
+					/>
+					{isSidebarOpen && (
+						<span className='whitespace-nowrap text-sm font-semibold text-white'>
+							LI.FI Intent Agent
 						</span>
-						<kbd className='rounded border border-[#2f2f2f] px-1.5 py-0.5 text-[10px] text-[#5f5f5f] transition group-hover:text-[#b4b4b4]'>
-							Ctrl K
-						</kbd>
-					</button>
-
-					<button
-						aria-label='收起侧边栏'
-						className='ml-1 rounded-lg p-2 text-[#b4b4b4] transition hover:bg-[#212121] hover:text-white'
-						onClick={() => setIsSidebarOpen(false)}
-						type='button'
-					>
-						<Icon name='panel-left-close' />
-					</button>
-				</section>
-
-				<nav className='flex-1 space-y-0.5 overflow-y-auto px-2 py-2'>
-					{sessions.map((session) => {
-						const isActive = session.id === currentSessionId;
-						return (
-							<div
-								className={`group flex items-center rounded-lg text-xs transition ${
-									isActive
-										? 'bg-[#212121] font-medium text-white'
-										: 'text-[#b4b4b4] hover:bg-[#212121]/60 hover:text-[#ececec]'
-								}`}
-								key={session.id}
-							>
-								<button
-									className='flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2 text-left'
-									onClick={() => setCurrentSessionId(session.id)}
-									type='button'
-								>
-									<Icon
-										className='h-3.5 w-3.5 shrink-0 opacity-80'
-										name='message-square'
-									/>
-									<span
-										className='truncate'
-										onDoubleClick={(event) => {
-											event.stopPropagation();
-											renameSession(session.id);
-										}}
-									>
-										{session.title}
-									</span>
-								</button>
-								<button
-									aria-label='删除对话'
-									className='mr-2 rounded p-1 opacity-0 transition hover:text-white group-hover:opacity-100'
-									onClick={() => deleteSession(session.id)}
-									type='button'
-								>
-									<Icon
-										className='h-3.5 w-3.5'
-										name='trash-2'
-									/>
-								</button>
-							</div>
-						);
-					})}
-				</nav>
-
-				<section className='flex items-center justify-between border-t border-[#2f2f2f] p-3 text-sm text-[#b4b4b4]'>
-					<button
-						className='flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition hover:bg-[#212121]'
-						type='button'
-					>
-						<span className='flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#2f2f2f] text-[11px] font-bold text-white'>
-							U
-						</span>
-						<span className='truncate text-xs'>Premium User</span>
-					</button>
-					<button
-						aria-label='设置'
-						className='rounded-lg p-2 transition hover:bg-[#212121] hover:text-white'
-						type='button'
-					>
-						<Icon name='settings' />
-					</button>
-				</section>
-			</aside>
-
-			{!isSidebarOpen ? (
+					)}
+				</div>
 				<button
-					aria-label='展开侧边栏'
-					className='fixed left-4 top-4 z-30 rounded-lg border border-[#2f2f2f] bg-[#212121] p-2 text-[#b4b4b4] transition hover:bg-[#2f2f2f] hover:text-white'
-					onClick={() => setIsSidebarOpen(true)}
+					aria-label={isSidebarOpen ? '收起侧边栏' : '展开侧边栏'}
+					className='ml-1 shrink-0 rounded-lg p-1.5 text-(--c-text2) transition hover:bg-(--c-bg) hover:text-white'
+					onClick={() => setIsSidebarOpen(!isSidebarOpen)}
 					type='button'
 				>
-					<Icon name='panel-left-open' />
+					<Icon name={isSidebarOpen ? 'panel-left-close' : 'panel-left-open'} />
 				</button>
-			) : null}
+			</header>
 
-			<section className='relative flex h-full min-w-0 flex-1 flex-col bg-[#212121]'>
-				<header className='flex h-14 shrink-0 items-center justify-between border-b border-[#2f2f2f]/30 px-4 sm:px-6'>
+			{isSidebarOpen && (
+				<>
+					<div className='px-3 pb-2 pt-3'>
+						<button
+							className='group flex w-full items-center justify-between rounded-lg border border-(--c-border) px-3 py-2.5 text-sm text-(--c-text2) transition hover:border-[#3f3f3f] hover:bg-(--c-bg) hover:text-white'
+							onClick={startNewSession}
+							type='button'
+						>
+							<span className='flex items-center gap-2'>
+								<Icon className='h-4 w-4' name='plus' />
+								新对话
+							</span>
+							<kbd className='rounded border border-(--c-border) px-1.5 py-0.5 text-[10px] transition group-hover:border-[#3f3f3f] group-hover:text-(--c-text2)'>
+								Ctrl K
+							</kbd>
+						</button>
+					</div>
+
+					<nav className='flex-1 space-y-0.5 overflow-y-auto px-2 pb-2'>
+						{sessions.map((session) => {
+							const isActive = session.id === currentSessionId;
+							const isDeleting = deletingId === session.id;
+							return (
+								<div
+									className={`group flex cursor-pointer items-center rounded-lg px-3 py-2.5 transition ${
+										isActive
+											? 'bg-(--c-bg) text-white'
+											: 'text-(--c-text2) hover:bg-(--c-bg)/60 hover:text-(--c-text1)'
+									}`}
+									key={session.id}
+									onClick={() => { setDeletingId(null); setCurrentSessionId(session.id); }}
+								>
+									<Icon className='mr-2.5 h-3.5 w-3.5 shrink-0' name='message-square' />
+									<div className='min-w-0 flex-1'>
+										<p
+											className='truncate text-xs font-medium leading-snug'
+											onDoubleClick={(e) => { e.stopPropagation(); renameSession(session.id); }}
+										>
+											{session.title}
+										</p>
+										{session.createdAt && (
+											<p className='mt-0.5 text-[10px] text-(--c-text4)'>
+												{formatDateTime(session.createdAt)}
+											</p>
+										)}
+									</div>
+									<div
+										className={`ml-1 flex shrink-0 items-center gap-0.5 transition ${
+											isDeleting ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+										}`}
+									>
+										{isDeleting ? (
+											<>
+												<button
+													className='rounded px-1.5 py-0.5 text-[10px] font-medium text-red-400 hover:bg-red-400/10'
+													onClick={(e) => { e.stopPropagation(); deleteSession(session.id); }}
+													type='button'
+												>
+													确认
+												</button>
+												<button
+													className='rounded px-1 py-0.5 text-[10px] text-(--c-text2) hover:text-white'
+													onClick={(e) => { e.stopPropagation(); setDeletingId(null); }}
+													type='button'
+												>
+													✕
+												</button>
+											</>
+										) : (
+											<button
+												aria-label='删除对话'
+												className='rounded p-1 text-(--c-text2) transition hover:text-red-400'
+												onClick={(e) => { e.stopPropagation(); setDeletingId(session.id); }}
+												type='button'
+											>
+												<Icon className='h-3.5 w-3.5' name='trash-2' />
+											</button>
+										)}
+									</div>
+								</div>
+							);
+						})}
+					</nav>
+
+				</>
+			)}
+		</aside>
+
+			<section className='relative flex h-full min-w-0 flex-1 flex-col bg-(--c-bg)'>
+				<header className='flex h-14 shrink-0 items-center justify-between border-b border-(--c-border)/30 px-4 sm:px-6'>
 					<div className='flex min-w-0 items-center gap-3'>
 						<span className={`${isSidebarOpen ? 'w-8' : 'w-10'} shrink-0`} />
-						<span className='truncate text-sm font-medium text-[#ececec]'>
-							{hasMessages ? currentSession?.title : 'ChatGPT'}
+						<span className='truncate text-sm font-medium text-(--c-text1)'>
+							{hasMessages ? currentSession?.title : 'LI.FI Intent Agent'}
 						</span>
 					</div>
-					<button
-						aria-label='清空对话'
-						className='rounded-lg p-2 text-[#b4b4b4] transition hover:bg-[#2f2f2f]/50 hover:text-white'
-						onClick={clearCurrentMessages}
-						type='button'
-					>
-						<Icon name='trash' />
-					</button>
+					<div className='flex items-center gap-2'>
+						<button
+							aria-label='切换主题'
+							className='rounded-lg border border-(--c-border) bg-(--c-surface) p-1.5 text-(--c-text2) transition hover:bg-(--c-surface2) hover:text-(--c-text1)'
+							onClick={toggleTheme}
+							type='button'
+						>
+							<Icon name={theme === 'dark' ? 'sun' : 'moon'} />
+						</button>
+						<button
+							className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+								isConnected
+									? 'border-(--c-border2) bg-(--c-surface) text-(--c-text1) hover:bg-(--c-surface2)'
+									: 'border-[#4a6cf7]/40 bg-[#4a6cf7]/10 text-[#7c9fff] hover:bg-[#4a6cf7]/20'
+							}`}
+							onClick={() => openAppKit()}
+							type='button'
+						>
+							<span
+								className={`h-1.5 w-1.5 rounded-full ${
+									isConnected ? 'bg-emerald-400' : 'bg-[#7c9fff] animate-pulse'
+								}`}
+							/>
+							{isConnected
+								? `${address?.slice(0, 6)}…${address?.slice(-4)}${caipNetwork?.name ? ` · ${caipNetwork.name}` : ''}`
+								: '连接钱包'}
+						</button>
+					</div>
 				</header>
 
-				<section
-					className='flex-1 overflow-y-auto'
-					ref={chatContainerRef}
-				>
-					{!hasMessages ? (
-						<WelcomeView onSelectPrompt={sendMessage} />
+				<section className='flex-1 overflow-y-auto' ref={chatContainerRef}>
+					{!hasMessages && displayMessages.length === 0 ? (
+						<WelcomeView onSelectPrompt={handleSend} />
 					) : (
-						<MessageList messages={currentSession?.messages ?? []} />
+						<MessageList messages={displayMessages} />
 					)}
 				</section>
 
-				<footer className='shrink-0 bg-gradient-to-t from-[#212121] via-[#212121] to-transparent p-4'>
+				<footer className='shrink-0 bg-gradient-to-t from-(--c-bg) via-(--c-bg) to-transparent p-4'>
 					<section className='relative mx-auto max-w-2xl'>
-						<div className='flex flex-col gap-2 rounded-2xl border border-[#3c3c3c] bg-[#2f2f2f] px-4 py-3 transition focus-within:border-[#5c5c5c]'>
+						<div className='flex flex-col gap-2 rounded-2xl border border-(--c-border2) bg-(--c-surface) px-4 py-3 transition focus-within:border-[#5c5c5c]'>
 							<textarea
-								className='max-h-36 w-full resize-none bg-transparent text-sm leading-relaxed text-[#ececec] placeholder-[#8e8e8e] outline-none'
-								onChange={(event) => setInput(event.target.value)}
-								onKeyDown={(event) => {
-									if (event.key === 'Enter' && !event.shiftKey) {
-										event.preventDefault();
-										sendMessage();
+								className='max-h-36 w-full resize-none bg-transparent text-sm leading-relaxed text-(--c-text1) placeholder-(--c-text3) outline-none'
+								disabled={isStreaming}
+								onChange={(e) => setInput(e.target.value)}
+								onKeyDown={(e) => {
+									if (e.key === 'Enter' && !e.shiftKey) {
+										e.preventDefault();
+										handleSend();
 									}
 								}}
-								placeholder='给 Agent 发送消息...'
+								placeholder={
+									isConnected
+										? '给 Agent 发送消息...'
+										: '请先连接钱包，再发送消息'
+								}
 								ref={textareaRef}
 								rows={1}
 								value={input}
 							/>
 
-							<div className='flex items-center justify-between pt-1'>
-								<button
-									aria-label='添加附件'
-									className='rounded-lg p-1.5 text-[#b4b4b4] transition hover:bg-[#3c3c3c] hover:text-white'
-									type='button'
-								>
-									<Icon name='paperclip' />
-								</button>
-								<button
-									aria-label='发送消息'
-									className='flex items-center justify-center rounded-lg bg-white p-1.5 text-black transition hover:bg-[#e2e2e2] disabled:cursor-not-allowed disabled:opacity-30'
-									disabled={!input.trim()}
-									onClick={() => sendMessage()}
-									type='button'
-								>
-									<Icon name='arrow-up' />
-								</button>
+							<div className='flex items-center justify-end pt-1'>
+								{isStreaming ? (
+									<button
+										aria-label='停止生成'
+										className='flex items-center justify-center rounded-lg bg-(--c-surface2) p-1.5 text-(--c-text2) transition hover:bg-[#4c4c4c] hover:text-white'
+										onClick={stop}
+										type='button'
+									>
+										<Icon name='stop-circle' />
+									</button>
+								) : (
+									<button
+										aria-label={isConnected ? '发送消息' : '连接钱包'}
+										className='flex items-center justify-center rounded-lg bg-white p-1.5 text-black transition hover:bg-[#e2e2e2] disabled:cursor-not-allowed disabled:opacity-30'
+										disabled={!input.trim() && isConnected}
+										onClick={() => handleSend()}
+										type='button'
+									>
+										<Icon name='arrow-up' />
+									</button>
+								)}
 							</div>
 						</div>
-						<p className='mt-2 text-center text-[11px] text-[#8e8e8e]'>
-							Agent 可能会犯错。请核对重要信息。
+						<p className='mt-2 text-center text-[11px] text-(--c-text3)'>
+							Agent 可能会犯错，请核对重要信息。
 						</p>
 					</section>
 				</footer>
 			</section>
 		</main>
+	);
+}
+
+function TypewriterTitle({ text }: { text: string }) {
+	const [displayed, setDisplayed] = useState('');
+	const [done, setDone] = useState(false);
+
+	useEffect(() => {
+		setDisplayed('');
+		setDone(false);
+		let i = 0;
+		const id = setInterval(() => {
+			i += 1;
+			setDisplayed(text.slice(0, i));
+			if (i >= text.length) {
+				clearInterval(id);
+				setDone(true);
+			}
+		}, 60);
+		return () => clearInterval(id);
+	}, [text]);
+
+	return (
+		<h1 className='mb-2 font-bold tracking-tight'>
+			<span className='bg-gradient-to-r from-violet-400 via-indigo-300 to-cyan-400 bg-clip-text text-3xl text-transparent'>
+				{displayed}
+			</span>
+			<span
+				className={`ml-0.5 inline-block h-7 w-0.5 align-middle bg-indigo-400 ${
+					done ? 'animate-[blink_1s_step-end_infinite]' : ''
+				}`}
+				style={done ? {} : { opacity: 1 }}
+			/>
+		</h1>
 	);
 }
 
@@ -531,26 +614,22 @@ function WelcomeView({
 }) {
 	return (
 		<section className='flex h-full select-none flex-col items-center justify-center px-4 text-center'>
-			<div className='mb-6 flex h-12 w-12 items-center justify-center rounded-full border border-[#2f2f2f] bg-[#171717]'>
-				<Icon
-					className='h-6 w-6 text-white'
-					name='terminal'
-				/>
+			<div className='mb-6'>
+				<img alt='LI.FI Intent Agent' className='h-30 w-30 object-contain' src='/logo.png' />
 			</div>
-			<h1 className='mb-8 text-2xl font-semibold tracking-tight text-white'>
-				今天想聊点什么？
-			</h1>
+			<TypewriterTitle text='LI.FI Intent Agent' />
+			<p className='mb-8 text-sm text-(--c-text3)'>
+				🤖用自然语言描述你的跨链兑换需求
+			</p>
 			<div className='grid w-full max-w-xl grid-cols-1 gap-3 text-left md:grid-cols-2'>
 				{promptCards.map((card) => (
 					<button
-						className='rounded-xl border border-[#2f2f2f] p-3.5 text-left text-xs text-[#b4b4b4] transition hover:bg-[#2f2f2f]/30 hover:text-white'
+						className='rounded-xl border border-(--c-border) p-3.5 text-left text-xs text-(--c-text2) transition hover:bg-(--c-surface)/30 hover:text-white'
 						key={card.title}
 						onClick={() => onSelectPrompt(card.prompt)}
 						type='button'
 					>
-						<span className='mb-1 block font-medium text-white'>
-							{card.title}
-						</span>
+						<span className='mb-1 block font-medium text-white'>{card.title}</span>
 						{card.description}
 					</button>
 				))}
@@ -559,37 +638,39 @@ function WelcomeView({
 	);
 }
 
-function MessageList({ messages }: { messages: Message[] }) {
+function MessageList({ messages }: { messages: LifiAgentUIMessage[] }) {
 	return (
 		<section className='mx-auto max-w-2xl space-y-8 px-4 py-8'>
 			{messages.map((message, index) => {
-				const isUser = message.sender === 'user';
+				const isUser = message.role === 'user';
 
 				return (
 					<article
 						className={`flex animate-fade-in gap-4 ${
 							isUser ? 'justify-end' : 'justify-start'
 						}`}
-						key={`${message.sender}-${index}-${message.text.slice(0, 12)}`}
+						key={message.id ?? index}
 					>
 						{isUser ? (
 							<div className='flex max-w-[85%] flex-col items-end'>
-								<p className='rounded-2xl border border-[#3c3c3c] bg-[#2f2f2f] px-4 py-2.5 text-sm leading-relaxed text-[#ececec]'>
-									{message.text}
+								<p className='rounded-2xl border border-(--c-border2) bg-(--c-surface) px-4 py-2.5 text-sm leading-relaxed text-(--c-text1)'>
+									{message.parts
+										.filter((p) => p.type === 'text')
+										.map((p, i) => (
+											<span key={i}>{(p as { type: 'text'; text: string }).text}</span>
+										))}
 								</p>
 							</div>
 						) : (
 							<div className='flex max-w-[90%] items-start gap-4'>
-								<div className='flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#2f2f2f] bg-[#171717] text-xs text-white'>
+								<div className='flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-(--c-border) bg-(--c-sidebar) text-xs text-white'>
 									<Icon name='bot' />
 								</div>
-								<div className='flex-1 space-y-1.5 pt-0.5'>
-									<div className='text-[11px] font-semibold tracking-wider text-[#8e8e8e]'>
+								<div className='flex-1 space-y-2 pt-0.5'>
+									<div className='text-[11px] font-semibold tracking-wider text-(--c-text3)'>
 										AGENT
 									</div>
-									<p className='whitespace-pre-line text-sm leading-relaxed text-[#ececec]'>
-										{message.text}
-									</p>
+									<AgentMessage message={message} />
 								</div>
 							</div>
 						)}
