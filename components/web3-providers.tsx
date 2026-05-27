@@ -5,6 +5,7 @@ import type { AppKitNetwork } from "@reown/appkit/networks";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { WagmiProvider, cookieToInitialState } from "wagmi";
 import { type ReactNode } from "react";
+import { ThemeProvider } from 'next-themes';
 import { projectId, networks, wagmiAdapter, appKitMetadata } from "@/lib/web3/appkit";
 
 // createAppKit must be called at module scope — exactly once
@@ -33,8 +34,10 @@ export function Web3Providers({
   const initialState = cookieToInitialState(wagmiAdapter.wagmiConfig, cookie);
 
   return (
-    <WagmiProvider config={wagmiAdapter.wagmiConfig} initialState={initialState}>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    </WagmiProvider>
+    <ThemeProvider attribute='class' defaultTheme='dark' disableTransitionOnChange={false}>
+      <WagmiProvider config={wagmiAdapter.wagmiConfig} initialState={initialState}>
+        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      </WagmiProvider>
+    </ThemeProvider>
   );
 }

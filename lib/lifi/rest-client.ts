@@ -126,7 +126,7 @@ export function createLifiRestClient(options: RestClientOptions): LifiIntentClie
         throw new UnsupportedRouteError(
           `No quotes available for ${intent.sourceToken!.symbol} (${chainName(srcChainId)}) → ` +
           `${intent.destinationToken!.symbol} (${chainName(dstChainId)}). ` +
-          `The route may not be supported in the current environment.`
+          `No solver is currently quoting this pair — it may be temporarily out of inventory. Try again shortly or adjust the amount.`
         );
       }
 
@@ -143,7 +143,7 @@ export function createLifiRestClient(options: RestClientOptions): LifiIntentClie
       return {
         quoteId,
         validUntil: typeof best.validUntil === "number"
-          ? best.validUntil
+          ? (best.validUntil < 1e12 ? best.validUntil * 1000 : best.validUntil)
           : Date.now() + 60_000,
         swapMode,
         input: {

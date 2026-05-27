@@ -2,6 +2,8 @@ import { tool } from "ai";
 import { LifiQuoteInputSchema } from "@/lib/lifi/schemas";
 import { createLifiIntentClient } from "@/lib/lifi/client";
 import { chainName } from "@/lib/lifi/token-resolver";
+import { checkRoute } from "@/lib/lifi/routes-cache";
+import { UnsupportedRouteError } from "@/lib/lifi/errors";
 
 export const lifiQuoteTool = tool({
   description:
@@ -9,6 +11,29 @@ export const lifiQuoteTool = tool({
     "Returns the best quote with input/output amounts, expiry, and a summary of the next wallet action required.",
   inputSchema: LifiQuoteInputSchema,
   execute: async (input) => {
+    // Pre-validate against the cached /routes inventory.
+    // LI.FI Intents solvers only ship same-token cross-chain pairs (e.g. USDT→USDT).
+    // Fail fast with concrete alternatives instead of a vague "no quotes" response.
+    const routeCheck = await checkRoute({
+      fromChainId: input.sourceChainId,
+      fromSymbol: input.sourceTokenSymbol,
+      fromAddress: input.sourceTokenAddress,
+      toChainId: input.destinationChainId,
+      toSymbol: input.destinationTokenSymbol,
+      toAddress: input.destinationTokenAddress,
+    });
+    if (!routeCheck.supported) {
+      return {
+        success: false,
+        error: routeCheck.reason,
+        chainPairExists: routeCheck.chainPairExists,
+        alternatives: routeCheck.alternatives,
+        suggestion: routeCheck.chainPairExists
+          ? "LI.FI Intents only routes SAME-TOKEN cross-chain transfers. Pick one of the alternatives above, or first swap into a supported token before bridging."
+          : "This chain pair has no solver routes. Pick a different source/destination chain.",
+      };
+    }
+
     const client = createLifiIntentClient();
 
     try {
@@ -54,9 +79,14 @@ export const lifiQuoteTool = tool({
         nextAction: "Call prepareOrder with this quoteId to get the wallet action.",
       };
     } catch (err) {
+      const isNoQuote = err instanceof UnsupportedRouteError;
       return {
         success: false,
         error: err instanceof Error ? err.message : String(err),
+        retryable: isNoQuote,
+        suggestion: isNoQuote
+          ? "No solver is filling this pair right now. The user can retry in a minute, try a different amount, or use an alternative route (e.g. via a different intermediate chain)."
+          : undefined,
       };
     }
   },

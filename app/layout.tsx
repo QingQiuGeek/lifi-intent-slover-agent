@@ -17,7 +17,7 @@ export default async function RootLayout({
   const cookie = headersStore.get("cookie");
 
   return (
-    <html lang="zh-CN" className="h-full antialiased">
+    <html lang="zh-CN" className="h-full antialiased" suppressHydrationWarning>
       <body className="min-h-full overflow-hidden">
         <Web3Providers cookie={cookie}>{children}</Web3Providers>
       </body>

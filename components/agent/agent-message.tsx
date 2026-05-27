@@ -1,6 +1,50 @@
 "use client";
 
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { LifiAgentUIMessage } from "@/lib/agents/lifi-agent";
+
+const mdComponents = {
+  table: (props: React.HTMLAttributes<HTMLTableElement>) => (
+    <div className="my-2 overflow-x-auto rounded-lg border border-(--c-border)">
+      <table className="w-full text-sm" {...props} />
+    </div>
+  ),
+  thead: (props: React.HTMLAttributes<HTMLTableSectionElement>) => (
+    <thead className="bg-(--c-surface) text-(--c-text2)" {...props} />
+  ),
+  th: (props: React.ThHTMLAttributes<HTMLTableCellElement>) => (
+    <th className="px-3 py-2 text-left text-xs font-semibold tracking-wide" {...props} />
+  ),
+  td: (props: React.TdHTMLAttributes<HTMLTableCellElement>) => (
+    <td className="border-t border-(--c-border) px-3 py-2 text-(--c-text1)" {...props} />
+  ),
+  code: ({ children, className, ...props }: React.HTMLAttributes<HTMLElement>) => {
+    const isBlock = className?.includes("language-");
+    return isBlock ? (
+      <pre className="my-2 overflow-x-auto rounded-lg bg-(--c-surface) p-3 text-[13px] text-(--c-text1)">
+        <code className={className} {...props}>{children}</code>
+      </pre>
+    ) : (
+      <code className="rounded bg-(--c-surface) px-1 py-0.5 text-[13px]" {...props}>{children}</code>
+    );
+  },
+  p: (props: React.HTMLAttributes<HTMLParagraphElement>) => (
+    <p className="leading-relaxed" {...props} />
+  ),
+  strong: (props: React.HTMLAttributes<HTMLElement>) => (
+    <strong className="font-semibold text-(--c-text1)" {...props} />
+  ),
+  a: (props: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+    <a className="text-blue-400 underline hover:text-blue-300" target="_blank" rel="noreferrer" {...props} />
+  ),
+  ul: (props: React.HTMLAttributes<HTMLUListElement>) => (
+    <ul className="my-1 list-inside list-disc space-y-0.5 pl-2" {...props} />
+  ),
+  ol: (props: React.OlHTMLAttributes<HTMLOListElement>) => (
+    <ol className="my-1 list-inside list-decimal space-y-0.5 pl-2" {...props} />
+  ),
+};
 
 type Props = {
   message: LifiAgentUIMessage;
@@ -12,12 +56,9 @@ export function AgentMessage({ message }: Props) {
       {message.parts.map((part, idx) => {
         if (part.type === "text") {
           return (
-            <p
-              key={idx}
-              className="whitespace-pre-line text-sm leading-relaxed text-[#ececec]"
-            >
-              {part.text}
-            </p>
+            <div key={idx} className="space-y-2 text-[15px] leading-relaxed text-(--c-text1)">
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{part.text}</ReactMarkdown>
+            </div>
           );
         }
 
@@ -42,9 +83,9 @@ export function AgentMessage({ message }: Props) {
             return (
               <div
                 key={idx}
-                className="inline-flex items-center gap-1.5 rounded-full border border-[#3c3c3c] bg-[#2a2a2a] px-2.5 py-1 text-[11px] text-[#8e8e8e]"
+                className="inline-flex items-center gap-1.5 rounded-full border border-(--c-border2) bg-(--c-surface) px-2.5 py-1 text-[11px] text-(--c-text3)"
               >
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#5c5c5c]" />
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-(--c-text4)" />
                 {toolLabel[part.type] ?? part.type}…
               </div>
             );
