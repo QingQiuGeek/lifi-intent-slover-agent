@@ -4,7 +4,7 @@
 
 # LI.FI Intent Agent
 
-**🏆 Hackathon Project — An AI agent that turns plain-language cross-chain swap requests into executable intents via the LI.FI Solver Marketplace.**
+**🏆 Hackathon Project — An AI agent that turns plain-language cross-chain swap requests into fully executed on-chain intents via the LI.FI Solver Marketplace.**
 
 [![Hackathon](https://img.shields.io/badge/🏆-Hackathon%20Project-f59e0b)](https://docs.li.fi/lifi-intents/introduction)
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-Vercel-black?logo=vercel)](https://lifi-intent-slover-agent-nbt95rhaa-3343759238-qqcoms-projects.vercel.app/)
@@ -23,31 +23,36 @@
 
 ### Overview
 
-**LI.FI Intent Agent** is a hackathon project that bridges natural language and on-chain cross-chain transfers. Built with the [Vercel AI SDK](https://ai-sdk.dev/) tool-loop agent pattern, it lets you describe a swap in plain English or Chinese — the agent parses your intent, routes it through the [LI.FI Intent/Solver Marketplace](https://docs.li.fi/lifi-intents/introduction), fetches a live quote, and (when complete) guides you through the single on-chain wallet step needed to settle the transfer.
+**LI.FI Intent Agent** is a hackathon project that bridges natural language and on-chain cross-chain transfers. Built with the [Vercel AI SDK](https://ai-sdk.dev/) tool-loop agent pattern, it lets you describe a swap in plain English or Chinese — the agent parses your intent, routes it through the [LI.FI Intent/Solver Marketplace](https://docs.li.fi/lifi-intents/introduction), fetches a live quote, and guides you through every wallet step needed to complete the cross-chain transfer end-to-end.
 
-The AI SDK's `ToolLoopAgent` drives the entire reasoning loop: each turn the model decides which tool to call next (`extractIntent → requestQuote → prepareOrder → submitOrder → trackOrder`), with structured Zod schemas enforcing type safety at every boundary.
-
-> **Note:** Order preparation and on-chain submission (tasks 14 & 15) are under active development. The agent currently covers intent parsing, quote fetching, and order tracking.
+The AI SDK `streamText` tool-loop drives the entire reasoning pipeline. Each turn the model autonomously decides which tool to call next (`requestQuote → prepareOrder → planWalletAction → submitOrder → trackOrder`), with Zod schemas enforcing type safety at every boundary. The escrow open transaction is constructed client-side from the quote — no undocumented API calls.
 
 ---
 
 ### Screenshots
 
-| Home — welcome cards | Chat — fallback suggestions |
+| Home — quick swap suggestions | Unsupported route — smart alternatives |
 |---|---|
 | ![Home](./asset/首页.png) | ![Session 1](./asset/会话1.png) |
 
-| Chat — multi-hop quote plan | Chat — two-step route table |
+| Multi-hop plan — quote via relay chain | Two-step route table (Polygon → Arbitrum → Ethereum) |
 |---|---|
 | ![Session 2](./asset/会话2.png) | ![Session 3](./asset/会话3.png) |
+
+| Order prepared — escrow tx built | MetaMask approval popup triggered |
+|---|---|
+| ![Prepare Order](./asset/准备订单.png) | ![Wallet Auth](./asset/授权钱包.png) |
 
 ---
 
 ### Features
 
-- **Natural language interface** — describe swaps like "Swap 5 USDC on Base to Arbitrum" and the agent handles the rest
+- **Natural language interface** — describe swaps like "Swap 5 USDC on Arbitrum to Optimism" and the agent handles the rest
 - **Smart quote routing** — fetches live quotes from LI.FI Intents solvers; surfaces multi-hop alternatives (e.g. Polygon → Arbitrum → Ethereum) when a direct route has no solver inventory
-- **Markdown-rendered results** — quote summaries are displayed as formatted tables with input/output amounts, bridge fees, and quote expiry
+- **Full on-chain execution** — builds `InputSettlerEscrow.open()` calldata locally from the quote, requests ERC-20 approval if needed, then sends the escrow deposit — all guided step by step
+- **Auto chain switching** — detects wallet chain mismatch and prompts a one-click network switch before approval or deposit
+- **Collapsible tool output cards** — tool calls (quote, prepare order, wallet action, track order) render as compact pill badges; expand to view full JSON
+- **Order tracking** — polls `/orders/status` and shows live status (⏳ Signed → 🔄 Delivered → ✅ Settled) with a one-click refresh button
 - **Session history** — sidebar lists all past conversations with auto-generated titles; click the logo to start a new session
 - **Wallet connection** — connect any EVM wallet via Reown AppKit (MetaMask, WalletConnect, Coinbase Wallet, etc.)
 - **Dark / Light theme** — system-aware, toggle in header
@@ -129,16 +134,27 @@ Open [http://localhost:3000](http://localhost:3000).
 ### Project Structure
 
 ```
-app/                    # Next.js App Router
-  api/chat/             # Streaming chat API route (AI agent)
+app/
+  api/chat/             # Streaming chat API route — AI agent backend
 components/
-  agent/                # AgentMessage — markdown-rendered AI responses
-  chat/                 # ChatSidebar, MessageList, WelcomeView, Header
+  agent/                # AgentMessage, ToolCallCard, WalletActionCard
+  ai-studio-chat.tsx    # Chat input, session management
 lib/
   agents/               # Agent definition, system prompt
-  lifi/                 # LI.FI REST client, token resolver, route cache
-  tools/                # AI SDK tools: extractIntent, requestQuote, trackOrder
-  web3/                 # wagmi config, wallet hooks
+  lifi/
+    rest-client.ts      # LI.FI Intents REST client
+    contracts.ts        # InputSettlerEscrow ABI + StandardOrder encoding
+    chains-config.ts    # Supported chains, known tokens, NATIVE_SENTINEL
+    token-resolver.ts   # Token address → symbol lookup
+    schemas.ts          # Zod input schemas for all tools
+    types.ts            # WalletAction, LifiQuoteSummary, SubmittedOrder …
+  tools/
+    lifi-quote-tool.ts          # requestQuote
+    lifi-prepare-order-tool.ts  # prepareOrder (builds escrow open tx)
+    wallet-action-tool.ts       # planWalletAction
+    lifi-submit-order-tool.ts   # submitOrder
+    lifi-track-order-tool.ts    # trackOrder
+  wallet/               # ERC-20 ABI helpers
   storage/              # localStorage session persistence
 ```
 
@@ -160,31 +176,36 @@ lib/
 
 ### 项目简介
 
-**LI.FI Intent Agent** 是一个黑客松项目，将自然语言与链上跨链转账打通。基于 [Vercel AI SDK](https://ai-sdk.dev/) 的工具循环 Agent 模式构建：你只需用中文或英文描述兑换需求，Agent 自动解析意图、通过 [LI.FI Intent/Solver 市场](https://docs.li.fi/lifi-intents/introduction)获取实时报价，并（完成后）引导你完成唯一一笔链上钱包操作。
+**LI.FI Intent Agent** 是一个黑客松项目，将自然语言与链上跨链转账端到端打通。基于 [Vercel AI SDK](https://ai-sdk.dev/) 的工具循环模式构建：你只需用中文或英文描述兑换需求，Agent 自动解析意图、通过 [LI.FI Intent/Solver 市场](https://docs.li.fi/lifi-intents/introduction)获取实时报价，并引导你完成每一步链上钱包操作，直到跨链转账完成。
 
-AI SDK 的 `ToolLoopAgent` 驱动整个推理循环：每一轮模型自主决定调用哪个工具（`extractIntent → requestQuote → prepareOrder → submitOrder → trackOrder`），Zod schema 在每个边界强制类型安全。
-
-> **说明：** 订单准备和链上提交（任务 14 & 15）正在开发中。当前已支持意图解析、报价获取和订单追踪。
+AI SDK `streamText` 工具循环驱动整个推理流水线：每一轮模型自主决定下一步调用哪个工具（`requestQuote → prepareOrder → planWalletAction → submitOrder → trackOrder`），Zod schema 在每个边界强制类型安全。Escrow open 交易从报价数据在客户端本地构建，无需调用任何未公开 API。
 
 ---
 
 ### 截图预览
 
-| 首页 — 快捷操作卡片 | 对话 — 智能替代方案 |
+| 首页 — 快捷操作卡片 | 不支持路由 — 智能替代方案 |
 |---|---|
 | ![首页](./asset/首页.png) | ![会话1](./asset/会话1.png) |
 
-| 对话 — 多跳报价方案 | 对话 — 两步路由表格 |
+| 多跳方案 — 经中继链报价 | 两步路由表格（Polygon → Arbitrum → Ethereum） |
 |---|---|
 | ![会话2](./asset/会话2.png) | ![会话3](./asset/会话3.png) |
+
+| 订单已准备 — Escrow 交易已构建 | MetaMask 授权弹窗触发 |
+|---|---|
+| ![准备订单](./asset/准备订单.png) | ![授权钱包](./asset/授权钱包.png) |
 
 ---
 
 ### 主要功能
 
-- **自然语言输入** — 用对话描述需求，如"把 Base 上的 5 USDC 换到 Arbitrum"
+- **自然语言输入** — 用对话描述需求，如"把 Arbitrum 上的 5 USDC 桥接到 Optimism"
 - **智能报价路由** — 实时从 LI.FI Intents solver 网络获取报价；当直接路由暂无 solver 时，自动规划多跳替代路线（如 Polygon → Arbitrum → Ethereum）
-- **Markdown 渲染** — 报价结果以格式化表格展示，含输入/输出金额、桥接费率、报价过期时间
+- **链上全流程执行** — 本地从报价构建 `InputSettlerEscrow.open()` calldata，按需请求 ERC-20 授权，再发送 escrow 存款交易，全程分步引导
+- **自动切链** — 检测钱包链不匹配时，一键提示切换到目标网络，再执行授权或存款
+- **可折叠工具输出卡片** — 报价、准备订单、钱包操作、追踪订单均以紧凑卡片展示，点击展开查看完整 JSON
+- **订单追踪** — 轮询 `/orders/status`，实时显示状态（⏳ Signed → 🔄 Delivered → ✅ Settled），支持一键刷新
 - **会话历史** — 侧边栏列出所有历史对话，自动生成标题；点击 logo 开启新会话
 - **钱包连接** — 支持通过 Reown AppKit 连接任意 EVM 钱包（MetaMask、WalletConnect、Coinbase 等）
 - **明暗主题** — 跟随系统偏好，可在顶栏手动切换
@@ -266,16 +287,27 @@ npm run dev
 ### 目录结构
 
 ```
-app/                    # Next.js App Router
+app/
   api/chat/             # 流式聊天 API 路由（AI Agent 后端）
 components/
-  agent/                # AgentMessage — Markdown 渲染的 AI 回复
-  chat/                 # ChatSidebar、MessageList、WelcomeView、Header
+  agent/                # AgentMessage、ToolCallCard、WalletActionCard
+  ai-studio-chat.tsx    # 聊天输入、会话管理
 lib/
   agents/               # Agent 定义、系统提示词
-  lifi/                 # LI.FI REST 客户端、代币解析、路由缓存
-  tools/                # AI SDK 工具：extractIntent、requestQuote、trackOrder
-  web3/                 # wagmi 配置、钱包 hooks
+  lifi/
+    rest-client.ts      # LI.FI Intents REST 客户端
+    contracts.ts        # InputSettlerEscrow ABI + StandardOrder 编码
+    chains-config.ts    # 支持链、已知代币、NATIVE_SENTINEL
+    token-resolver.ts   # 代币地址 → symbol 查找
+    schemas.ts          # 所有工具的 Zod 输入 schema
+    types.ts            # WalletAction、LifiQuoteSummary、SubmittedOrder …
+  tools/
+    lifi-quote-tool.ts          # requestQuote
+    lifi-prepare-order-tool.ts  # prepareOrder（本地构建 escrow open tx）
+    wallet-action-tool.ts       # planWalletAction
+    lifi-submit-order-tool.ts   # submitOrder
+    lifi-track-order-tool.ts    # trackOrder
+  wallet/               # ERC-20 ABI 辅助
   storage/              # localStorage 会话持久化
 ```
 
