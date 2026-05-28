@@ -31,16 +31,24 @@ export function ChatSidebar({
 }: ChatSidebarProps) {
 	return (
 		<aside
-			className={`z-20 flex h-full shrink-0 flex-col border-r border-(--c-border) bg-(--c-sidebar) transition-all duration-300 ${
-				isSidebarOpen ? 'w-64' : 'w-14'
-			}`}
+			className={[
+				'flex h-full flex-col border-r border-(--c-border) bg-(--c-sidebar)',
+				'transition-all duration-300',
+				// Mobile: fixed overlay, slides in/out
+				'fixed inset-y-0 left-0 z-30 shrink-0',
+				// Desktop: inline in flex layout
+				'md:relative md:inset-auto md:z-20',
+				isSidebarOpen
+					? 'w-64 translate-x-0 shadow-2xl md:shadow-none'
+					: '-translate-x-full md:translate-x-0 w-64 md:w-14',
+			].join(' ')}
 			aria-label='对话历史'
 		>
 			<header className='flex items-center justify-between border-b border-(--c-border) px-3 py-3'>
 				<button
 					className='flex min-w-0 cursor-pointer items-center gap-2.5 rounded-lg p-0 transition hover:opacity-80'
 					onClick={onStartNewSession}
-					title='回到首页（新对话）'
+					title='回到首页'
 					type='button'
 				>
 					<img

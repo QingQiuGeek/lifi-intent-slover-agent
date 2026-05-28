@@ -91,6 +91,44 @@ body {
   animation: blink 1s step-end infinite;
 }
 
+/* ── Chat input glass effect ─────────────────────────── */
+.chat-glass-input {
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  box-shadow:
+    0 2px 12px rgba(0, 0, 0, 0.06),
+    0 8px 32px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.90);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.chat-glass-input:focus-within {
+  border-color: rgba(0, 0, 0, 0.13);
+  box-shadow:
+    0 0 0 3px rgba(0, 0, 0, 0.04),
+    0 8px 32px rgba(0, 0, 0, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+.dark .chat-glass-input {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 2px 12px rgba(0, 0, 0, 0.30),
+    0 8px 32px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.dark .chat-glass-input:focus-within {
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.03),
+    0 8px 32px rgba(0, 0, 0, 0.40),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10);
+}
+
 /* ── Smooth theme transition ──────────────────────────── */
 *:not([class*="animate"]):not(img):not(svg):not(path):not(circle):not(rect) {
   transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;

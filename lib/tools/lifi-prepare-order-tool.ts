@@ -5,6 +5,40 @@ import { NATIVE_SENTINEL } from "@/lib/lifi/chains-config";
 import { chainName } from "@/lib/lifi/token-resolver";
 import { buildEscrowOpenTx } from "@/lib/lifi/contracts";
 
+function normalizeQuoteSummary(raw: unknown): LifiQuoteSummary | undefined {
+  if (!raw) return undefined;
+
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed === "[omitted]") return undefined;
+    try {
+      return normalizeQuoteSummary(JSON.parse(trimmed));
+    } catch {
+      return undefined;
+    }
+  }
+
+  if (typeof raw !== "object") return undefined;
+
+  const obj = raw as Record<string, unknown>;
+
+  const candidate =
+    (obj.quoteSummary != null ? obj.quoteSummary :
+     obj.quote       != null ? obj.quote       :
+     obj) as Partial<LifiQuoteSummary>;
+
+  if (
+    typeof candidate.quoteId    === "string" &&
+    typeof candidate.validUntil === "number" &&
+    candidate.input  != null &&
+    candidate.output != null
+  ) {
+    return candidate as LifiQuoteSummary;
+  }
+
+  return undefined;
+}
+
 export const lifiPrepareOrderTool = tool({
   description:
     "Prepare a LI.FI order for wallet execution. " +
@@ -14,27 +48,15 @@ export const lifiPrepareOrderTool = tool({
   inputSchema: LifiPrepareOrderInputSchema,
   execute: async (input) => {
     try {
-      // Normalize: LLM sometimes passes quoteSummary as a JSON string
-      const rawInput = input.quoteSummary;
-      const parsedInput: unknown =
-        typeof rawInput === "string" ? JSON.parse(rawInput) : rawInput;
+      const resolvedSummary = normalizeQuoteSummary(input.quoteSummary);
 
-      const quoteSummary = parsedInput as LifiQuoteSummary | undefined;
-
-      if (!quoteSummary) {
+      if (!resolvedSummary) {
         return {
           success: false,
-          error: "quoteSummary is required. Pass the quoteSummary field from requestQuote result.",
+          error:
+            "quoteSummary could not be parsed. Call requestQuote again and pass the quoteSummary object from its result.",
         };
       }
-
-      // Handle the case where the LLM accidentally wraps in { success, quoteSummary, ... }
-      const resolvedSummary: LifiQuoteSummary =
-        (quoteSummary as Record<string, unknown>).quoteSummary != null
-          ? ((quoteSummary as Record<string, unknown>).quoteSummary as LifiQuoteSummary)
-          : (quoteSummary as Record<string, unknown>).quote != null
-          ? ((quoteSummary as Record<string, unknown>).quote as LifiQuoteSummary)
-          : quoteSummary;
 
       // Guard: reject if the quote has already expired
       if (resolvedSummary.validUntil != null && resolvedSummary.validUntil < Date.now()) {

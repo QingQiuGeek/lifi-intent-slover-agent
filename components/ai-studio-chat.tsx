@@ -20,7 +20,7 @@ export function AiStudioChat() {
 	const [sessions, setSessions] = useState<Session[]>([]);
 	const [currentSessionId, setCurrentSessionId] = useState('');
 	const [input, setInput] = useState('');
-	const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+	const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 	const [deletingId, setDeletingId] = useState<string | null>(null);
 	const [focusTrigger, setFocusTrigger] = useState(0);
 	const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -30,6 +30,10 @@ export function AiStudioChat() {
 	// Holds a message that was typed BEFORE a session existed;
 	// dispatched by useEffect once useChat re-initialises with the new session id.
 	const pendingMessageRef = useRef<string | null>(null);
+
+	useEffect(() => {
+		setIsSidebarOpen(window.innerWidth >= 768);
+	}, []);
 
 	const { open: openAppKit } = useAppKit();
 	const { isConnected, address } = useAppKitAccount();
@@ -175,18 +179,29 @@ export function AiStudioChat() {
 
 	const headerTitle = hasMessages ? (currentSession?.title ?? '') : 'LI.FI Intent Agent';
 
+	const toggleSidebar = () => setIsSidebarOpen((o) => !o);
+
 	return (
 		<main className='flex h-dvh overflow-hidden bg-(--c-bg) text-(--c-text1)'>
+			{/* Mobile backdrop — closes sidebar when tapping outside */}
+			{isSidebarOpen && (
+				<div
+					aria-hidden='true'
+					className='fixed inset-0 z-20 bg-black/50 md:hidden'
+					onClick={toggleSidebar}
+				/>
+			)}
+
 			<ChatSidebar
 				sessions={sessions}
 				currentSessionId={currentSessionId}
 				deletingId={deletingId}
 				isSidebarOpen={isSidebarOpen}
-				onSelectSession={setCurrentSessionId}
-				onStartNewSession={startNewSession}
+				onSelectSession={(id) => { setCurrentSessionId(id); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
+				onStartNewSession={() => { startNewSession(); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
 				onDeleteSession={deleteSession}
 				onRenameSession={renameSession}
-				onToggleSidebar={() => setIsSidebarOpen((o) => !o)}
+				onToggleSidebar={toggleSidebar}
 				onSetDeletingId={setDeletingId}
 			/>
 
@@ -197,6 +212,7 @@ export function AiStudioChat() {
 					address={address}
 					caipNetworkName={caipNetwork?.name}
 					onOpenWallet={() => openAppKit()}
+					onToggleSidebar={toggleSidebar}
 				/>
 
 				<div className='flex-1 overflow-y-auto' ref={chatContainerRef}>

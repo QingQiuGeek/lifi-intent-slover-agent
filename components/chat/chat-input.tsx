@@ -40,9 +40,9 @@ export function ChatInput({
 	}, [focusTrigger]);
 
 	return (
-		<footer className='shrink-0 bg-gradient-to-t from-(--c-bg) via-(--c-bg) to-transparent p-4'>
+		<footer className='shrink-0 bg-gradient-to-t from-(--c-bg) from-60% via-(--c-bg)/80 to-transparent px-4 pb-4 pt-8'>
 			<div className='relative mx-auto max-w-2xl'>
-				<div className='flex items-end gap-2 rounded-2xl border border-(--c-border2) bg-(--c-surface) pl-4 pr-2 py-2.5 transition focus-within:border-(--c-text4)'>
+				<div className='chat-glass-input flex items-end gap-2 rounded-2xl pl-4 pr-2 py-2.5'>
 					<textarea
 						className='max-h-36 flex-1 resize-none bg-transparent text-sm leading-relaxed text-(--c-text1) placeholder-(--c-text3) outline-none py-0.5'
 						disabled={isStreaming}
@@ -72,7 +72,7 @@ export function ChatInput({
 						) : (
 							<button
 								aria-label={isConnected ? '发送消息' : '连接钱包'}
-								className='flex items-center justify-center rounded-lg bg-(--c-text1) p-1.5 text-(--c-bg) transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-30'
+								className='flex items-center justify-center rounded-lg bg-(--c-text1) p-1.5 text-(--c-bg) shadow-sm transition hover:opacity-75 disabled:cursor-not-allowed disabled:opacity-25'
 								disabled={!value.trim() && isConnected}
 								onClick={onSend}
 								type='button'

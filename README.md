@@ -160,6 +160,28 @@ lib/
 
 ---
 
+### Session Storage
+
+All conversation history is stored **entirely in your browser's `localStorage`** — no data is sent to any server.
+
+| What is stored | Details |
+|---|---|
+| Session list | All conversation titles and IDs |
+| Message history | Full message content including tool outputs |
+| Active session | Last viewed session ID |
+
+**How to delete:**
+
+| Method | Steps |
+|---|---|
+| Delete a single conversation | Hover over a session in the sidebar → click the 🗑 icon → confirm |
+| Clear all conversations | Open DevTools → Application → Local Storage → `http://localhost:3000` → right-click → Clear |
+| Clear from the browser | Browser Settings → Privacy → Clear browsing data → Cached / Site Data |
+
+> **Privacy note:** Wallet addresses and quote data are stored as part of message history. Clearing localStorage removes everything permanently.
+
+---
+
 ### Reference
 
 - [LI.FI Intents Introduction](https://docs.li.fi/lifi-intents/introduction)
@@ -310,6 +332,28 @@ lib/
   wallet/               # ERC-20 ABI 辅助
   storage/              # localStorage 会话持久化
 ```
+
+---
+
+### 会话存储规则
+
+所有历史对话完全存储在你的浏览器 **`localStorage`** 中，不会上传到任何服务器。
+
+| 存储内容 | 说明 |
+|---|---|
+| 会话列表 | 所有对话的标题和 ID |
+| 消息内容 | 完整的聊天记录，包含工具输出 |
+| 当前会话 | 最后打开的对话 ID |
+
+**如何删除：**
+
+| 方式 | 操作步骤 |
+|---|---|
+| 删除单条对话 | 在侧边栏悬停对话条目 → 点击 🗑 图标 → 点确认 |
+| 清除全部对话 | 打开 DevTools → Application → Local Storage → 当前地址 → 右键 → Clear |
+| 浏览器清除 | 浏览器设置 → 隐私与安全 → 清除浏览数据 → 勾选 「Cached 数据 / 站点数据」 |
+
+> **隐私提示：** 钱包地址和报价数据作为消息内容的一部分会被存储。清除 localStorage 将永久删除所有记录。
 
 ---
 
