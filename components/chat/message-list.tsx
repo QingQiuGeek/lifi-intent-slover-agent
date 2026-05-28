@@ -38,7 +38,13 @@ function CopyButton({ text }: { text: string }) {
 	);
 }
 
-export function MessageList({ messages }: { messages: LifiAgentUIMessage[] }) {
+export function MessageList({
+	messages,
+	onSendMessage,
+}: {
+	messages: LifiAgentUIMessage[];
+	onSendMessage?: (text: string) => void;
+}) {
 	return (
 		<section className='mx-auto max-w-2xl space-y-8 px-4 py-8'>
 			{messages.map((message, index) => {
@@ -67,7 +73,7 @@ export function MessageList({ messages }: { messages: LifiAgentUIMessage[] }) {
 									<div className='text-xs font-semibold tracking-wide text-(--c-text2)'>
 										LI.FI Intent Agent
 									</div>
-									<AgentMessage message={message} />
+									<AgentMessage message={message} onSendMessage={onSendMessage} />
 									{text && (
 										<div className='pt-1'>
 											<CopyButton text={text} />

@@ -24,6 +24,12 @@ export function AiStudioChat() {
 	const [deletingId, setDeletingId] = useState<string | null>(null);
 	const [focusTrigger, setFocusTrigger] = useState(0);
 	const chatContainerRef = useRef<HTMLDivElement>(null);
+	// Keeps the latest effective session ID for the transport body closure.
+	const activeSessionIdRef = useRef(currentSessionId);
+	activeSessionIdRef.current = currentSessionId;
+	// Holds a message that was typed BEFORE a session existed;
+	// dispatched by useEffect once useChat re-initialises with the new session id.
+	const pendingMessageRef = useRef<string | null>(null);
 
 	const { open: openAppKit } = useAppKit();
 	const { isConnected, address } = useAppKitAccount();
@@ -49,7 +55,7 @@ export function AiStudioChat() {
 		transport: new DefaultChatTransport({
 			api: '/api/chat',
 			body: () => ({
-				sessionId: currentSessionId,
+				sessionId: activeSessionIdRef.current,
 				walletAddress: address ?? undefined,
 				chainId: connectedChainId ?? undefined,
 			}),
@@ -118,6 +124,16 @@ export function AiStudioChat() {
 		setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, title } : s)));
 	}
 
+	// When there was no session yet and we deferred the first message,
+	// send it once useChat has re-initialised for the new session id.
+	useEffect(() => {
+		if (pendingMessageRef.current && currentSessionId) {
+			const text = pendingMessageRef.current;
+			pendingMessageRef.current = null;
+			sendMessage({ text });
+		}
+	}, [currentSessionId, sendMessage]);
+
 	const handleSend = useCallback(
 		(text = input.trim()) => {
 			const messageText = text.trim();
@@ -127,20 +143,25 @@ export function AiStudioChat() {
 
 			let targetId = currentSessionId;
 			if (!targetId) {
+				// No session yet — create one, then defer sendMessage via useEffect
+				// (useChat must re-initialise with the new id before we can send)
 				const newSession = createSession(getShortTitle(messageText, 30));
 				setSessions((prev) => [newSession, ...prev]);
 				setCurrentSessionId(newSession.id);
-				targetId = newSession.id;
-			} else {
-				setSessions((prev) =>
-					prev.map((s) => {
-						if (s.id !== targetId) return s;
-						return s.messages.length === 0
-							? { ...s, title: getShortTitle(messageText, 30) }
-							: s;
-					}),
-				);
+				activeSessionIdRef.current = newSession.id;
+				pendingMessageRef.current = messageText; // will be sent by useEffect
+				setInput('');
+				return;
 			}
+
+			setSessions((prev) =>
+				prev.map((s) => {
+					if (s.id !== targetId) return s;
+					return s.messages.length === 0
+						? { ...s, title: getShortTitle(messageText, 30) }
+						: s;
+				}),
+			);
 
 			sendMessage({ text: messageText });
 			setInput('');
@@ -182,7 +203,10 @@ export function AiStudioChat() {
 					{!hasMessages && displayMessages.length === 0 ? (
 						<WelcomeView onSelectPrompt={handleSend} />
 					) : (
-						<MessageList messages={displayMessages} />
+						<MessageList
+						messages={displayMessages}
+						onSendMessage={(text) => sendMessage({ text })}
+					/>
 					)}
 				</div>
 

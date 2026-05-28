@@ -67,7 +67,14 @@ export const lifiQuoteTool = tool({
 
       return {
         success: true,
-        quote,
+        quoteId: quote.quoteId,
+        quoteSummary: {
+          quoteId: quote.quoteId,
+          validUntil: quote.validUntil,
+          swapMode: quote.swapMode,
+          input: quote.input,
+          output: quote.output,
+        },
         summary: {
           from: `${quote.input.amount} ${quote.input.token.symbol} on ${srcChainLabel}`,
           to: `${quote.output.amount} ${quote.output.token.symbol} on ${dstChainLabel}`,
@@ -76,7 +83,7 @@ export const lifiQuoteTool = tool({
           quoteId: quote.quoteId,
           swapMode: quote.swapMode,
         },
-        nextAction: "Call prepareOrder with this quoteId to get the wallet action.",
+        nextAction: "Call prepareOrder with quoteId=<quoteId> and quoteSummary=<quoteSummary> from this result.",
       };
     } catch (err) {
       const isNoQuote = err instanceof UnsupportedRouteError;

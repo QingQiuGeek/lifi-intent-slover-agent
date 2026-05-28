@@ -48,7 +48,7 @@ export const LifiQuoteInputSchema = z.object({
 export const LifiPrepareOrderInputSchema = z.object({
   quoteId: z.string().describe("The quote ID from requestQuote"),
   userAddress: z.string().describe("User wallet address"),
-  quoteSummary: z.unknown().describe("The quote summary object from requestQuote"),
+  quoteSummary: z.unknown().describe("Pass the quoteSummary field exactly as returned by requestQuote (not the entire result, not summary — the quoteSummary field)"),
 });
 
 export const LifiSubmitOrderInputSchema = z.object({

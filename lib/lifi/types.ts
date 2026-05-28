@@ -76,6 +76,24 @@ export type WalletAction =
       reason: string;
     };
 
+export type PreparedOrder = {
+  quoteId: string;
+  orderType: string;
+  chainId: number;
+  transaction: {
+    to: `0x${string}`;
+    data: `0x${string}`;
+    value: string;
+  };
+  /** Present when the source token is ERC-20 and needs prior approval */
+  approval?: {
+    token: `0x${string}`;
+    spender: `0x${string}`;
+    amount: string;
+  };
+  raw: unknown;
+};
+
 export type SubmittedOrder = {
   catalystOrderId?: string;
   onChainOrderId?: string;

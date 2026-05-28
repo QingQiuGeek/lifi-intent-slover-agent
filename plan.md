@@ -1143,7 +1143,7 @@ npm run build
 - 新建：`lib/wallet/erc20.ts`
 
 **步骤：**
-1. 针对选定的 LI.FI API/MCP 响应实现 prepare order 路径。
+1. 针对选定的 LI.FI API 响应实现 prepare order 路径。
 2. 判断当前需要的是 allowance、typed-data 签名还是交易发送。
 3. 生成 `WalletAction`。
 4. 在浏览器中使用 wagmi/viem 执行钱包动作。
@@ -1173,7 +1173,7 @@ npm run build
 
 **步骤：**
 1. 只有在钱包动作结果已存在时才允许提交。
-2. 调用 `/orders/submit` 或 MCP 的 `submit-order`。
+2. 调用 `/orders/submit` 。
 3. 将响应归一化成 `SubmittedOrder`。
 4. 将订单持久化到 browser store。
 5. 立即触发一次 `trackOrder`。
@@ -1348,5 +1348,5 @@ npm run dev
 - 最终使用哪个兼容 OpenAI 协议的模型提供方和模型 ID
 - 第一阶段接入 LI.FI development 还是 production
 - LI.FI MCP 是主传输还是备用传输
-- 订单提交是在签名后 one-click 自动继续，还是必须二次显式确认
+- 订单提交是在签名后 one-click 自动继续，还是必须二次显式确认-----采用自动继续
 - 后续持久化存储应使用 IndexedDB、Supabase、Postgres 还是其他后端

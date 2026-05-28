@@ -1,4 +1,4 @@
-import type { LifiQuoteSummary, NaturalLanguageIntent, SubmittedOrder } from "@/lib/lifi/types";
+import type { LifiQuoteSummary, NaturalLanguageIntent, PreparedOrder, SubmittedOrder } from "@/lib/lifi/types";
 import { createLifiRestClient } from "@/lib/lifi/rest-client";
 
 export type QuoteRequestInput = {
@@ -10,6 +10,12 @@ export type QuoteRequestInput = {
 export type PrepareOrderInput = {
   quoteId: string;
   userAddress: `0x${string}`;
+  /** Source token contract address — used to determine if ERC-20 approval is needed */
+  sourceTokenAddress?: string;
+  sourceTokenIsNative?: boolean;
+  sourceChainId?: number;
+  /** Raw amount in token units (for fallback approval amount) */
+  sourceAmountRaw?: string;
 };
 
 export type SubmitOrderInput = {
@@ -27,7 +33,7 @@ export type LifiIntentClient = {
   getSupportedChains(): Promise<unknown>;
   getSupportedRoutes(): Promise<unknown>;
   requestQuote(input: QuoteRequestInput): Promise<LifiQuoteSummary>;
-  prepareOrder(input: PrepareOrderInput): Promise<unknown>;
+  prepareOrder(input: PrepareOrderInput): Promise<PreparedOrder>;
   submitOrder(input: SubmitOrderInput): Promise<SubmittedOrder>;
   trackOrder(input: TrackOrderInput): Promise<SubmittedOrder>;
 };

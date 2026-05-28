@@ -1,5 +1,6 @@
-import type { LifiIntentClient, QuoteRequestInput } from "@/lib/lifi/client";
-import type { LifiQuoteSummary, SubmittedOrder } from "@/lib/lifi/types";
+import type { LifiIntentClient, PrepareOrderInput, QuoteRequestInput } from "@/lib/lifi/client";
+import type { LifiQuoteSummary, PreparedOrder, SubmittedOrder } from "@/lib/lifi/types";
+import { NATIVE_SENTINEL } from "@/lib/lifi/chains-config";
 import { LifiApiError, MissingIntentFieldError, UnsupportedRouteError } from "@/lib/lifi/errors";
 import {
   resolveChainId,
@@ -171,12 +172,36 @@ export function createLifiRestClient(options: RestClientOptions): LifiIntentClie
       };
     },
 
-    async prepareOrder(_input) {
-      throw new Error("prepareOrder not implemented yet (task 14)");
+    async prepareOrder(_input: PrepareOrderInput): Promise<PreparedOrder> {
+      // The LI.FI Intents API has no /quote/prepare endpoint.
+      // Order preparation is done entirely client-side via buildEscrowOpenTx() in contracts.ts.
+      throw new LifiApiError(501, "prepareOrder should be handled client-side via lifi-prepare-order-tool, not via REST client.");
     },
 
-    async submitOrder(_input) {
-      throw new Error("submitOrder not implemented yet (task 15)");
+    async submitOrder(input): Promise<SubmittedOrder> {
+      const prepared = input.preparedOrder as PreparedOrder | undefined;
+      const quoteId = prepared?.quoteId ?? (input as { quoteId?: string }).quoteId;
+      if (!quoteId) throw new LifiApiError(400, "submitOrder: quoteId is required");
+      if (!input.transactionHash) throw new LifiApiError(400, "submitOrder: transactionHash is required");
+
+      const body: Record<string, unknown> = {
+        quoteId,
+        transactionHash: input.transactionHash,
+      };
+
+      const data = await fetchJson<Record<string, unknown>>(
+        `${baseUrl}/orders/submit`,
+        { method: "POST", body: JSON.stringify(body) }
+      );
+
+      return {
+        catalystOrderId: (data.catalystOrderId as string | undefined),
+        onChainOrderId: (data.onChainOrderId as string | undefined),
+        status: (data.status as string | undefined) ?? "Signed",
+        quoteId,
+        createdAt: Date.now(),
+        raw: data,
+      };
     },
 
     async trackOrder(input): Promise<SubmittedOrder> {
@@ -192,10 +217,17 @@ export function createLifiRestClient(options: RestClientOptions): LifiIntentClie
         `${baseUrl}/orders/status?${params.toString()}`
       );
 
+      // LI.FI Intents API returns: { meta: { orderStatus, ... }, ... }
+      const meta = data.meta as Record<string, unknown> | undefined;
+      const status =
+        (meta?.orderStatus as string | undefined) ??
+        (data.status as string | undefined) ??
+        "unknown";
+
       return {
         catalystOrderId: (data.catalystOrderId as string | undefined) ?? catalystOrderId,
         onChainOrderId: (data.onChainOrderId as string | undefined) ?? onChainOrderId,
-        status: (data.status as string | undefined) ?? "unknown",
+        status,
         quoteId: data.quoteId as string | undefined,
         createdAt: Date.now(),
         raw: data,
