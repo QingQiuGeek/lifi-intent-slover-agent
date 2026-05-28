@@ -143,11 +143,12 @@ function SendTxCard({
       (log) => log.address.toLowerCase() === action.to.toLowerCase()
     );
     const onChainOrderId = openLog?.topics?.[1];
-    const orderIdPart = onChainOrderId
-      ? ` On-chain order ID: ${onChainOrderId}.`
-      : '';
+    const quoteIdPart = action.quoteId ? ` quoteId: ${action.quoteId}.` : '';
+    const orderIdPart = onChainOrderId ? ` onChainOrderId: ${onChainOrderId}.` : '';
     onSendMessage(
-      `Escrow deposit confirmed. Transaction hash: ${txHash}.${orderIdPart} Call trackOrder with the onChainOrderId to monitor status.`
+      `Escrow deposit confirmed. transactionHash: ${txHash}.${quoteIdPart}${orderIdPart}` +
+      ` Call submitOrder with this transactionHash${action.quoteId ? ' and quoteId' : ''} to register with LI.FI.` +
+      ` Then call trackOrder with the catalystOrderId returned by submitOrder.`
     );
   }
 

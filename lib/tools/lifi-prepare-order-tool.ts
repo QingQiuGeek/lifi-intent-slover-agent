@@ -36,6 +36,16 @@ export const lifiPrepareOrderTool = tool({
           ? ((quoteSummary as Record<string, unknown>).quote as LifiQuoteSummary)
           : quoteSummary;
 
+      // Guard: reject if the quote has already expired
+      if (resolvedSummary.validUntil != null && resolvedSummary.validUntil < Date.now()) {
+        const agoSec = Math.round((Date.now() - resolvedSummary.validUntil) / 1000);
+        return {
+          success: false,
+          expired: true,
+          error: `Quote expired ${agoSec}s ago. Call requestQuote again to get a fresh quote before calling prepareOrder.`,
+        };
+      }
+
       const srcToken = resolvedSummary.input?.token;
       const isNative =
         !srcToken?.address ||
@@ -72,6 +82,7 @@ export const lifiPrepareOrderTool = tool({
           to: tx.escrowAddress,
           data: tx.data,
           value: tx.value,
+          quoteId: input.quoteId,
           reason: `Open escrow order: deposit ${resolvedSummary.input.amount} ${srcToken?.symbol ?? ""} on ${chain} → receiver gets ${resolvedSummary.output.amount} ${resolvedSummary.output.token.symbol ?? ""} on destination chain`,
         },
         nextStep: needsApproval

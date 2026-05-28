@@ -19,11 +19,31 @@ export const lifiTrackOrderTool = tool({
 
     try {
       const order = await client.trackOrder(input);
+
+      const TERMINAL_STATUSES = ["Settled", "Refunded", "Expired", "Failed"];
+      const isTerminal = TERMINAL_STATUSES.includes(order.status ?? "");
+
+      const STATUS_MEANING: Record<string, string> = {
+        Signed:    "Order accepted by the order server; waiting for a solver to fill it.",
+        Delivered: "Solver has delivered assets on destination chain; awaiting final settlement.",
+        Settled:   "Settlement complete — the receiver has the funds.",
+        Refunded:  "Order was not filled; funds returned to sender.",
+        Expired:   "Fill deadline passed without settlement.",
+        Failed:    "Order failed.",
+      };
+
       return {
         success: true,
         order,
         displayId: order.catalystOrderId ?? order.onChainOrderId,
         status: order.status,
+        isTerminal,
+        meaning: STATUS_MEANING[order.status ?? ""] ?? "Status unknown.",
+        nextStep: isTerminal
+          ? order.status === "Settled"
+            ? "Show success summary with both chain explorer links."
+            : "Order ended in a non-success state. Explain to the user and offer next steps."
+          : "Order still in progress. Poll again in 15–20 seconds by calling trackOrder again.",
       };
     } catch (err) {
       return {

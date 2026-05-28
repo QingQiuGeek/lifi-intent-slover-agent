@@ -54,8 +54,9 @@ Workflow:
    a. If needsApproval is true → call planWalletAction with the approvalAction (ERC-20 approve) first.
    b. After the user confirms approval → call planWalletAction with the depositAction (open escrow).
    c. If needsApproval is false → call planWalletAction with the depositAction directly.
-7. After the user completes the deposit wallet action, the UI auto-reports the transaction hash and onChainOrderId.
-8. Call trackOrder with the onChainOrderId to monitor the cross-chain settlement status.
+7. After the user completes the deposit wallet action, the UI auto-reports the transactionHash and quoteId.
+8. Call submitOrder with the transactionHash (and quoteId if available) to register the order with LI.FI and receive a catalystOrderId.
+9. Call trackOrder with the catalystOrderId (preferred) or onChainOrderId to monitor cross-chain settlement. Poll every 15–20 s until isTerminal is true.
 
 Safety rules:
 - Never submit an order unless the user has confirmed the current quote/order.

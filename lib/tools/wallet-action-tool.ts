@@ -40,6 +40,7 @@ export const walletActionTool = tool({
           to: input.to as `0x${string}`,
           value: input.value,
           data: input.data as `0x${string}` | undefined,
+          quoteId: input.quoteId,
           reason: input.reason,
         };
         break;

@@ -154,8 +154,21 @@ function ToolCallCard({
         </span>
       );
     } else if (part.type === "tool-trackOrder" && isSuccess && output?.order) {
-      const status = String((output.order as Record<string, unknown>).status ?? "—");
-      collapsedDetail = <span className="ml-1.5 opacity-80">状态: {status}</span>;
+      const order = output.order as Record<string, unknown>;
+      const status = String(order.status ?? "—");
+      const icon =
+        status === "Settled"   ? "✅" :
+        status === "Delivered" ? "🔄" :
+        status === "Signed"    ? "⏳" :
+        status === "Refunded"  ? "↩️" :
+        status === "Expired"   ? "⌛" : "📋";
+      const shortId = String(order.catalystOrderId ?? order.onChainOrderId ?? "").slice(0, 12);
+      collapsedDetail = (
+        <span className="ml-1.5 opacity-90">
+          {icon} {status}
+          {shortId && <span className="ml-1.5 font-mono text-[10px] opacity-50">{shortId}…</span>}
+        </span>
+      );
     } else if (part.type === "tool-prepareOrder" && isSuccess) {
       collapsedDetail = <span className="ml-1.5 opacity-70">已构建 escrow 交易</span>;
     } else if (!isSuccess && output?.error) {
@@ -202,6 +215,23 @@ function ToolCallCard({
             </pre>
           </div>
         ) : null}
+
+        {isSuccess && part.type === "tool-trackOrder" && output?.isTerminal !== true && onSendMessage != null && (() => {
+          const order = output?.order as Record<string, unknown> | undefined;
+          const id = String(order?.catalystOrderId ?? order?.onChainOrderId ?? "");
+          if (!id) return null;
+          return (
+            <div className="border-t border-(--c-border2) px-3 py-2">
+              <button
+                type="button"
+                onClick={() => onSendMessage(`请重新查询订单状态，订单ID: ${id}`)}
+                className="rounded-md bg-(--c-surface2) px-3 py-1 text-xs text-(--c-text3) transition hover:text-(--c-text1)"
+              >
+                🔄 刷新状态
+              </button>
+            </div>
+          );
+        })()}
 
         {isSuccess && part.type === "tool-planWalletAction" && output?.action != null && onSendMessage != null && (
           <div className="border-t border-(--c-border2)">

@@ -61,6 +61,7 @@ export type WalletAction =
       to: `0x${string}`;
       value?: string;
       data?: `0x${string}`;
+      quoteId?: string;
       reason: string;
     }
   | {
